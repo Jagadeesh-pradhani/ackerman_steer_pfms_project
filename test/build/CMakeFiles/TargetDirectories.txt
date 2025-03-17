@@ -1,0 +1,7 @@
+/home/intel/danielbosh/Project_1_navigation_Task/Skeleton_Code/test/build/CMakeFiles/testAudi.dir
+/home/intel/danielbosh/Project_1_navigation_Task/Skeleton_Code/test/build/CMakeFiles/testHusky.dir
+/home/intel/danielbosh/Project_1_navigation_Task/Skeleton_Code/test/build/CMakeFiles/testAudiReachGoals.dir
+/home/intel/danielbosh/Project_1_navigation_Task/Skeleton_Code/test/build/CMakeFiles/testHuskyReachGoals.dir
+/home/intel/danielbosh/Project_1_navigation_Task/Skeleton_Code/test/build/CMakeFiles/testMission.dir
+/home/intel/danielbosh/Project_1_navigation_Task/Skeleton_Code/test/build/CMakeFiles/edit_cache.dir
+/home/intel/danielbosh/Project_1_navigation_Task/Skeleton_Code/test/build/CMakeFiles/rebuild_cache.dir
