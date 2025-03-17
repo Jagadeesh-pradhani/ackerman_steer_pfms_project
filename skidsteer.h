@@ -1,14 +1,13 @@
-#ifndef ACKERMAN_H
-#define ACKERMAN_H
+#ifndef SKIDSTEER_H
+#define SKIDSTEER_H
 
 #include "controller.h"
-#include "audi.h"
 
-class Ackerman: public Controller
+class SkidSteer: public Controller
 {
 public:
   // Default constructor should set all attributes to a default value
-  Ackerman();
+  SkidSteer();
 
   // Override virtual functions from ControllerInterface
   virtual bool reachGoal(void) override;
@@ -20,7 +19,7 @@ public:
   virtual double timeInMotion(void) override;
   virtual pfms::nav_msgs::Odometry getOdometry(void) override;
 
-  // Added: Override checkOriginToDestination from ControllerInterface
+  // Added: Override checkOriginToDestination
   virtual bool checkOriginToDestination(pfms::nav_msgs::Odometry origin,
                                         pfms::geometry_msgs::Point goal,
                                         double& distance,
@@ -28,4 +27,4 @@ public:
                                         pfms::nav_msgs::Odometry& estimatedGoalPose) override;
 };
 
-#endif // ACKERMAN_H
+#endif // SKIDSTEER_H
