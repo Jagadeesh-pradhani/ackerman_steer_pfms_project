@@ -103,12 +103,16 @@ bool Ackerman::reachGoal(void) {
                 break;
             case control::STOPPING:
                 // Check both distance and near-zero forward velocity.
-                if (distance < ackermanData.tolerance && std::fabs(ackermanData.odom.linear.x) < 0.1)
+                if (distance < std::fabs(ackermanData.odom.linear.x) < 0.1) {
                     goalReached = true;
-                else {
                     ackermanData.cmd.brake = 9000; // maximum braking torque
                     ackermanData.cmd.throttle = 0.0;
                     ackermanData.cmd.steering = 0.0;
+                }
+                else {
+                    ackermanData.cmd.brake = 0.0;
+                    ackermanData.cmd.steering = steering;
+                    ackermanData.cmd.throttle = 0.05;
                 }
                 break;
             default:
@@ -119,7 +123,8 @@ bool Ackerman::reachGoal(void) {
         ackermanData.cmd.seq++;
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         
-        std::cout << state << " Distance: " << distance << std::endl;
+        // std::cout << state << " Distance: " << distance << std::endl;
+        // std::cout << state << " callback: " << goalReached << std::endl;
     }
     
     ackermanData.totalDistance += distance;

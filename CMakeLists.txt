@@ -26,6 +26,15 @@ target_link_libraries(a1 controller mission)
 add_dependencies(a1 pfms2ros::pfmsconnector)
 link_directories(/usr/local/lib)
 
+# # Executables
+# add_executable(control_ackerman ackerman.cpp)
+
+# # Link the library
+# target_link_libraries(control_ackerman pfmsconnector audi)
+
+
+
+
 if(BUILD_TESTS)
    add_subdirectory(test)
 endif()

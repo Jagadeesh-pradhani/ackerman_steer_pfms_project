@@ -4,6 +4,19 @@
 #include <chrono>
 #include <cmath>
 
+// All numeric constants are declared here.
+namespace {
+    const double DEFAULT_TOLERANCE       = 0.5;
+    const double ANGULAR_ERROR_THRESHOLD = 0.1;
+    const double KP_ANG                  = 3.0;   // Gain for angular control.
+    const double KP_MOVE                 = 0.2;   // Gain for forward speed in MOVE state.
+    const double KP_COAST                = 0.2;   // Gain for forward speed in COAST state.
+    const double MAX_MOVE_SPEED          = 0.5;   // Maximum forward speed in MOVE state.
+    const double MAX_COAST_SPEED         = 0.3;   // Maximum forward speed in COAST state.
+    const double COAST_MULTIPLIER        = 2.0;   // Multiplier for tolerance to determine coast threshold.
+    const int    LOOP_SLEEP_MS           = 20;    // Loop sleep time in milliseconds.
+}
+
 // Internal helper class for SkidSteer state.
 class SkidSteerInternal {
 public:
@@ -15,7 +28,8 @@ public:
     pfms::commands::SkidSteer cmd;
     std::shared_ptr<PfmsConnector> connector;
     
-    SkidSteerInternal() : tolerance(0.5), totalDistance(0.0), totalTime(0.0) {
+    SkidSteerInternal() 
+      : tolerance(DEFAULT_TOLERANCE), totalDistance(0.0), totalTime(0.0) {
         cmd.seq = 0;
     }
 };
@@ -24,7 +38,7 @@ public:
 static SkidSteerInternal skidData;
 
 SkidSteer::SkidSteer() {
-    skidData.tolerance = 0.5;
+    skidData.tolerance = DEFAULT_TOLERANCE;
     if (!skidData.connector)
         skidData.connector = std::make_shared<PfmsConnector>(pfms::PlatformType::SKIDSTEER);
 }
@@ -38,7 +52,13 @@ bool SkidSteer::reachGoal(void) {
     bool goalReached = false;
     double distance = 0.0;
     double angularError = 0.0;
-    double kP = 1.0; // Proportional gain for angular control.
+    
+    // Define state machine states.
+    enum class State { IDLE, ROTATE, MOVE, COAST, STOPPING };
+    State state = State::IDLE;
+    
+    // Calculate coast threshold.
+    const double coastThreshold = COAST_MULTIPLIER * skidData.tolerance;
     
     while (!goalReached) {
         if (!skidData.connector->read(skidData.odom)) {
@@ -46,36 +66,91 @@ bool SkidSteer::reachGoal(void) {
             return false;
         }
         
-        // Compute distance using odom.position
+        // Compute distance to goal.
         distance = std::hypot(skidData.goal.x - skidData.odom.position.x,
                               skidData.goal.y - skidData.odom.position.y);
         
-        // Compute desired heading.
+        // Compute desired heading and angular error.
         double desiredHeading = std::atan2(skidData.goal.y - skidData.odom.position.y,
                                            skidData.goal.x - skidData.odom.position.x);
         double currentHeading = skidData.odom.yaw;
         angularError = desiredHeading - currentHeading;
-        while (angularError > M_PI) angularError -= 2 * M_PI;
+        while (angularError > M_PI)  angularError -= 2 * M_PI;
         while (angularError < -M_PI) angularError += 2 * M_PI;
         
-        if (std::fabs(angularError) > 0.1) {
-            skidData.cmd.move_f_b = 0.0;
-            skidData.cmd.turn_l_r = kP * angularError;
-        } else {
-            skidData.cmd.move_f_b = 0.1;
-            skidData.cmd.turn_l_r = 0.0;
+        // Update state machine transitions.
+        switch(state) {
+            case State::IDLE:
+                if (std::fabs(angularError) > ANGULAR_ERROR_THRESHOLD)
+                    state = State::ROTATE;
+                else if (distance > coastThreshold)
+                    state = State::MOVE;
+                else if (distance > skidData.tolerance)
+                    state = State::COAST;
+                else
+                    state = State::STOPPING;
+                break;
+                
+            case State::ROTATE:
+                if (std::fabs(angularError) <= ANGULAR_ERROR_THRESHOLD) {
+                    if (distance > coastThreshold)
+                        state = State::MOVE;
+                    else if (distance > skidData.tolerance)
+                        state = State::COAST;
+                    else
+                        state = State::STOPPING;
+                }
+                break;
+                
+            case State::MOVE:
+                if (distance <= coastThreshold)
+                    state = State::COAST;
+                break;
+                
+            case State::COAST:
+                if (distance <= skidData.tolerance)
+                    state = State::STOPPING;
+                else if (std::fabs(angularError) > ANGULAR_ERROR_THRESHOLD)
+                    state = State::ROTATE;
+                break;
+                
+            case State::STOPPING:
+                skidData.cmd.move_f_b = 0.0;
+                skidData.cmd.turn_l_r = 0.0;
+                goalReached = true;
+                break;
         }
         
-        if (distance < skidData.tolerance) {
-            goalReached = true;
+        // Issue commands based on the current state.
+        if (state == State::ROTATE) {
+            skidData.cmd.move_f_b = 0.0;
+            skidData.cmd.turn_l_r = KP_ANG * angularError;
+        } else if (state == State::MOVE) {
+            double forwardSpeed = KP_MOVE * distance;
+            if (forwardSpeed > MAX_MOVE_SPEED)
+                forwardSpeed = MAX_MOVE_SPEED;
+            skidData.cmd.move_f_b = forwardSpeed;
+            skidData.cmd.turn_l_r = 0.0;
+        } else if (state == State::COAST) {
+            double forwardSpeed = KP_COAST * distance;
+            if (forwardSpeed > MAX_COAST_SPEED)
+                forwardSpeed = MAX_COAST_SPEED;
+            skidData.cmd.move_f_b = forwardSpeed;
+            skidData.cmd.turn_l_r = 0.0;
+        } else if (state == State::IDLE) {
             skidData.cmd.move_f_b = 0.0;
             skidData.cmd.turn_l_r = 0.0;
         }
+        // In STOPPING state, commands remain zero.
         
         skidData.connector->send(skidData.cmd);
         skidData.cmd.seq++;
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        std::cout << "SkidSteer: Distance: " << distance << ", Angular Error: " << angularError << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(LOOP_SLEEP_MS));
+        
+        // std::cout << "SkidSteer State: " 
+        //           << (state == State::IDLE ? "IDLE" : state == State::ROTATE ? "ROTATE" : state == State::MOVE ? "MOVE" : state == State::COAST ? "COAST" : "STOPPING")
+        //           << ", Distance: " << distance 
+        //           << ", Angular Error: " << angularError << std::endl;
     }
     
     skidData.totalDistance += distance;

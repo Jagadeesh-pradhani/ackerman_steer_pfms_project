@@ -27,4 +27,19 @@ If you ever need to reset the simulator to the starting point execute below in a
 ros2 service call /reset_world std_srvs/srv/Empty 
 ```
 
+## build
+```bash
+cd ackerman_steer_pfms_project
+mkdir build
+cd build
+cmake ..
+make
+```
+
+## Test
+```bash
+cd build
+./test/testAudiReachGoals
+```
+
 

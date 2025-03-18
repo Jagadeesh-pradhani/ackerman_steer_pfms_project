@@ -73,6 +73,7 @@ TEST(AckermanExTest, ReachGoals) {
 
     //This now triggers the Ackerman to reach the goal and "blocks" until the goal is reached
     reached = controllers.at(0)->reachGoal();
+    std::cout <<" reached: " << reached << std::endl;
 
     //We now check that the goal has been reached (the reachGoal function returns when te goal is reached)
     ASSERT_TRUE(reached);

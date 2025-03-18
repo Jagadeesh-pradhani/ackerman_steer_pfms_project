@@ -23,8 +23,8 @@ public:
     virtual std::vector<unsigned int> getPlatformGoalAssociation() override;
 
 private:
-    std::vector<ControllerInterface*> controllers_; // copy of ControllerInterfaces
-    std::vector<pfms::geometry_msgs::Point> goals_;   // copy of goals
+    std::vector<ControllerInterface*> controllers_; // A private copy of ControllerInterfaces
+    std::vector<pfms::geometry_msgs::Point> goals_;   // A private copy of goals
 };
 
 #endif // MISSION_H
