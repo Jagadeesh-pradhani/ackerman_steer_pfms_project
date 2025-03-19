@@ -35,7 +35,7 @@ TEST(AckermanExTest, ReachGoals) {
     controllers.push_back(new Ackerman());
 
     //Goal at x=10,y=0,z=0;
-    pfms::geometry_msgs::Point pt1{10,0,0};
+    pfms::geometry_msgs::Point pt1{0,-6.0,0};
     //We set a tolerance for the goal reaching
     controllers.front()->setTolerance(0.5);
 

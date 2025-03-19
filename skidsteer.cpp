@@ -24,12 +24,14 @@ public:
     pfms::geometry_msgs::Point goal;
     double tolerance;
     double totalDistance;
+    double distanceToGoalVal;
     double totalTime;
+    double timeToGoalVal;
     pfms::commands::SkidSteer cmd;
     std::shared_ptr<PfmsConnector> connector;
     
     SkidSteerInternal() 
-      : tolerance(DEFAULT_TOLERANCE), totalDistance(0.0), totalTime(0.0) {
+      : tolerance(DEFAULT_TOLERANCE), totalDistance(0.0), distanceToGoalVal(0.0),timeToGoalVal(0.0), totalTime(0.0) {
         cmd.seq = 0;
     }
 };
@@ -158,13 +160,18 @@ bool SkidSteer::reachGoal(void) {
 }
 
 double SkidSteer::distanceToGoal(void) {
-    return std::hypot(skidData.goal.x - skidData.odom.position.x,
-                      skidData.goal.y - skidData.odom.position.y);
+    bool OK = skidData.connector->read(skidData.odom);
+    if(!OK)
+        std::cout << "No odom" << std::endl;
+    OK = checkOriginToDestination(skidData.odom, skidData.goal, skidData.distanceToGoalVal, skidData.timeToGoalVal, skidData.odom);
+    return skidData.distanceToGoalVal;
+
 }
 
 double SkidSteer::timeToGoal(void) {
-    // Placeholder for time estimation.
-    return 0.0;
+    bool OK = skidData.connector->read(skidData.odom);
+    OK = checkOriginToDestination(skidData.odom, skidData.goal, skidData.distanceToGoalVal, skidData.timeToGoalVal, skidData.odom);
+    return skidData.timeToGoalVal;
 }
 
 bool SkidSteer::setTolerance(double tolerance) {
@@ -190,7 +197,7 @@ bool SkidSteer::checkOriginToDestination(pfms::nav_msgs::Odometry origin,
                                           double& time,
                                           pfms::nav_msgs::Odometry& estimatedGoalPose) {
     distance = std::hypot(goal.x - origin.position.x, goal.y - origin.position.y);
-    time = distance / 2.91; // constant speed estimate
+    time = distance / (1.0 - 0.06); // constant speed estimate
     estimatedGoalPose = origin;
     estimatedGoalPose.position = goal;
     estimatedGoalPose.yaw = std::atan2(goal.y - origin.position.y, goal.x - origin.position.x);

@@ -31,8 +31,8 @@ public:
     pfms::nav_msgs::Odometry odom;
     pfms::geometry_msgs::Point goal;
     double tolerance;
-    double distanceToGoalVal;
-    double timeToGoalVal;
+    double distanceToGoalVal = 0.0;
+    double timeToGoalVal = 0.0;
     double totalDistance;
     double totalTime;
     pfms::commands::Ackerman cmd;
@@ -56,7 +56,12 @@ Ackerman::Ackerman() {
 }
 
 bool Ackerman::setGoal(pfms::geometry_msgs::Point goal) {
+    double steering;
+    double distance;
     ackermanData.goal = goal;
+    bool ok = ackermanData.audi.computeSteering(ackermanData.odom, ackermanData.goal, steering, distance);
+    if (!ok) 
+        return false;
     return true;
 }
 
@@ -103,7 +108,7 @@ bool Ackerman::reachGoal(void) {
                 break;
             case control::STOPPING:
                 // Check both distance and near-zero forward velocity.
-                if (distance < std::fabs(ackermanData.odom.linear.x) < 0.1) {
+                if (distance < ackermanData.tolerance) {
                     goalReached = true;
                     ackermanData.cmd.brake = 9000; // maximum braking torque
                     ackermanData.cmd.throttle = 0.0;
@@ -112,7 +117,7 @@ bool Ackerman::reachGoal(void) {
                 else {
                     ackermanData.cmd.brake = 0.0;
                     ackermanData.cmd.steering = steering;
-                    ackermanData.cmd.throttle = 0.05;
+                    ackermanData.cmd.throttle = 0.1;
                 }
                 break;
             default:
@@ -123,7 +128,7 @@ bool Ackerman::reachGoal(void) {
         ackermanData.cmd.seq++;
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         
-        // std::cout << state << " Distance: " << distance << std::endl;
+        std::cout << state << " Distance: " << distance << " steering" << steering<< std::endl;
         // std::cout << state << " callback: " << goalReached << std::endl;
     }
     
@@ -132,10 +137,15 @@ bool Ackerman::reachGoal(void) {
 }
 
 double Ackerman::distanceToGoal(void) {
+    // return ackermanData.distanceToGoalVal;
+    bool OK = ackermanData.connector->read(ackermanData.odom);
+    OK = ackermanData.audi.checkOriginToDestination(ackermanData.odom, ackermanData.goal, ackermanData.distanceToGoalVal, ackermanData.timeToGoalVal, ackermanData.odom);
+    std::cout << "distance : "<< ackermanData.distanceToGoalVal << std::endl;
     return ackermanData.distanceToGoalVal;
 }
 
 double Ackerman::timeToGoal(void) {
+    ackermanData.timeToGoalVal = ackermanData.distanceToGoalVal / 2.91;
     return ackermanData.timeToGoalVal;
 }
 
