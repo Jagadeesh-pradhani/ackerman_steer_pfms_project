@@ -58,9 +58,10 @@ Ackerman::Ackerman() {
 bool Ackerman::setGoal(pfms::geometry_msgs::Point goal) {
     double steering;
     double distance;
+    bool OK = ackermanData.connector->read(ackermanData.odom);
     ackermanData.goal = goal;
-    bool ok = ackermanData.audi.computeSteering(ackermanData.odom, ackermanData.goal, steering, distance);
-    if (!ok) 
+    OK = ackermanData.audi.computeSteering(ackermanData.odom, ackermanData.goal, steering, distance);
+    if (!OK) 
         return false;
     return true;
 }

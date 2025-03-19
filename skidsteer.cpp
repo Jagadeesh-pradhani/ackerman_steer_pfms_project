@@ -11,7 +11,7 @@ namespace {
     const double KP_ANG                  = 3.0;   // Gain for angular control.
     const double KP_MOVE                 = 0.2;   // Gain for forward speed in MOVE state.
     const double KP_COAST                = 0.2;   // Gain for forward speed in COAST state.
-    const double MAX_MOVE_SPEED          = 0.5;   // Maximum forward speed in MOVE state.
+    const double MAX_MOVE_SPEED          = 1.0;   // Maximum forward speed in MOVE state.
     const double MAX_COAST_SPEED         = 0.3;   // Maximum forward speed in COAST state.
     const double COAST_MULTIPLIER        = 2.0;   // Multiplier for tolerance to determine coast threshold.
     const int    LOOP_SLEEP_MS           = 20;    // Loop sleep time in milliseconds.
@@ -27,6 +27,10 @@ public:
     double distanceToGoalVal;
     double totalTime;
     double timeToGoalVal;
+    double rotate_right_ = -1.0;
+    double rotate_left_ = 1.0;
+    double move_foward_ = 1.0;
+    double move_reverse_ = -1.0;
     pfms::commands::SkidSteer cmd;
     std::shared_ptr<PfmsConnector> connector;
     
@@ -170,7 +174,20 @@ double SkidSteer::distanceToGoal(void) {
 
 double SkidSteer::timeToGoal(void) {
     bool OK = skidData.connector->read(skidData.odom);
-    OK = checkOriginToDestination(skidData.odom, skidData.goal, skidData.distanceToGoalVal, skidData.timeToGoalVal, skidData.odom);
+    
+    double rotatingAngleError;
+    
+    double angle = std::atan2(skidData.goal.y - skidData.odom.position.y, skidData.goal.x - skidData.odom.position.x);
+    
+    rotatingAngleError = skidData.odom.yaw - angle;
+    
+    rotatingAngleError = abs(rotatingAngleError);
+    
+    double distanceToGoal = std::sqrt(std::pow(skidData.odom.position.x - skidData.goal.x, 2) + std::pow(skidData.odom.position.y - skidData.goal.y, 2));
+    
+    double timeToGoal = rotatingAngleError/skidData.rotate_left_ + distanceToGoal/skidData.move_foward_;
+    skidData.timeToGoalVal = timeToGoal;
+    // OK = checkOriginToDestination(skidData.odom, skidData.goal, skidData.distanceToGoalVal, skidData.timeToGoalVal, skidData.odom);
     return skidData.timeToGoalVal;
 }
 

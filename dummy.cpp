@@ -1,100 +1,214 @@
-// Helper utility to send comamnd to ugv
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This executable shows the use of the pipes library to send commands
-// and receive odometry from the ugv platform
+#include <chrono>
+#include <thread>
+
+#include "skidsteer.h"
+#include "audi.h"
+#include "pfmsconnector.h"
 
 #include "pfms_types.h"
-#include "pfmsconnector.h"
-#include "audi.h"
-#include <iostream>
-#include <stdlib.h>
-#include <thread>
-#include <chrono>
-
-using std::cout;
-using std::endl;
-using pfms::commands::Ackerman; // we state this here to be able to refer to Ackerman commands instead of the full name
-
-int main(int argc, char *argv[]) {
-
-    // You can use below as starting point to pass a goal for instance, think what you need to do to parse the input
-    // if(argc !=3){
-    // }
-    // else{
-    //     atof(argv[2]);
-    // }
-
-    double x=10.0;
-    double y=5.0;
-
-    double brake = 0.0;
-    double steering = 0.0;
-    double throttle = 0.1;
-
-    //! Let's create an object of audi library
-    Audi audi;
-
-    //! Created a pointer to a Pipe 
-    pfms::PlatformType type = pfms::PlatformType::ACKERMAN;
-    std::shared_ptr<PfmsConnector> pfmsConnectorPtr = std::make_shared<PfmsConnector>(type);
-    pfms::nav_msgs::Odometry odo; // We will use this to store odometry
-
-    //! We can also send a goal to be visualised on rviz with the following commands
-    unsigned int seq=0;
-    pfms::geometry_msgs::Point pt{x,y};
-    pfms::geometry_msgs::Goal goal{seq++,pt};//if we wabt to send another goal to be visualised we need to increase seq number
-    pfmsConnectorPtr->send(goal);
-
-    //! We aim to drivie the Ackerman platform towards the goal, stopping at the goal withon a tolerance
-    //! We will use the odometry to check if we are close to the goal
-    //! We will use the Ackerman command to drive the platform
-    //! We will use the pfmsconnector to send commands and receive odometry data
-
-    // This creates a command for the Ackerman platform (refer pfms_types.h for more details)
-    for (unsigned int i=0;i<50;i++){
-        Ackerman cmd {
-                    i++, // This is the sequence number (refer to pfms_types.h)
-                    brake,
-                    steering,
-                    throttle,
-                    };
+#include "pfmshog.h"
 
 
-        // This sends the command to the platform
-        pfmsConnectorPtr->send(cmd);
-        //! This slows down the loop to 100Hz
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+SkidSteer::SkidSteer() {
 
-        //! This reads odometry from the platform
-        bool OK  =  pfmsConnectorPtr->read(odo);
 
-        if(OK){
-            std::cout << 
-                odo.time << " " <<
-                odo.position.x << " " <<
-                odo.position.y << " " <<
-                odo.yaw << " " <<
-                odo.linear.x << " " <<
-                odo.linear.y << std::endl;
+     //setting default movemnt charcteritics
+    
+    rotate_right_ = -1.0;
+    rotate_left_ = 1.0;
+    move_foward_ = 1.0;
+    move_reverse_ = -1.0;
+
+    platform_type_ = pfms::PlatformType::SKIDSTEER; // Set platform to SKIDSTEER.
+    ROS_communication_ = std::make_shared<PfmsConnector>(); // Initialize ROS communication.
+    
+   
+
+}
+
+// Method to set goal points the skid steer will go to.
+//Stores the provided goal point in the target_goal_ member variable.
+// Returns true to indicate success
+bool SkidSteer::setGoal(pfms::geometry_msgs::Point goal){
+
+    target_goal_ = goal;
+        return true;
+
+}
+
+// Driving the skidsteer to the goals
+bool SkidSteer::reachGoal(void){ 
+
+
+    //Reads the current odometry and updates distance traveled
+    bool readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+    distanceToGoal(); 
+    distance_travelled_by_platform_ = distance_travelled_by_platform_ + distance_platform_to_goal_; 
+
+    
+    bool orientation = false; 
+    unsigned long count = 1;
+    double angle = std::atan2(target_goal_.y - current_platform_odometry_.position.y, target_goal_.x - current_platform_odometry_.position.x); // Desired orientation angle.
+    double rotatingAngleError = current_platform_odometry_.yaw - angle; // Calculate initial angle error.
+    auto start = std::chrono::high_resolution_clock::now(); // Start time for performance measurement.
+
+    // Adjusts the vehicle’s orientation to face the goal.
+    while(!orientation){
+        // accounts and adjusts for angle error depending on which direction it is out by
+        if(rotatingAngleError > 0){
+            
+            //error to the right
+            
+            command_ = {count, rotate_right_, 0.0}; 
+            ROS_communication_->send(command_);
+            readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+            rotatingAngleError = current_platform_odometry_.yaw - angle - 0.25; 
+                
+                if(rotatingAngleError < 0.1){
+                    orientation = true; 
+                }
+        }   
+            //error to the left
+        else if(rotatingAngleError < 0){
+            command_ = {count, rotate_left_, 0.0}; // Command for counter-clockwise turn.
+            ROS_communication_->send(command_);
+            readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+            rotatingAngleError = current_platform_odometry_.yaw - angle + 0.2; // Update angle error.
+            
+                if(rotatingAngleError > M_PI){
+                    
+                    orientation = true; // Correct orientation achieved, considering angle wrap-around.
+                }
         }
-
-
-
-        double distance;
-        double time;
-        pfms::nav_msgs::Odometry estimatedGoalPose;
-        audi.checkOriginToDestination(odo, pt, distance, time, estimatedGoalPose);
-
-        std::cout << "Distance: " << distance << " Time: " << time << std::endl;
-
-        //We need to sleep for some time, to allow car to move on each iteration
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-   return 0;
+    command_ = {1, 0.0, 0.0};
+    ROS_communication_->send(command_);
+    
+    count = 1;
+
+    
+    bool arrivedAtGoal = false;
+    count = 1;
+    
+    while(!arrivedAtGoal){
+        // Drives the skidsteer towards the goal
+        command_ = {count, 0.0, move_foward_};
+        ROS_communication_->send(command_);
+        count++;
+        
+        
+        readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+        
+        double currentDistanceToGoal = std::sqrt(std::pow(target_goal_.x - current_platform_odometry_.position.x, 2) + std::pow(target_goal_.y - current_platform_odometry_.position.y, 2));
+        
+            if(currentDistanceToGoal < tolerance_value_){
+                
+                arrivedAtGoal = true; 
+            }
+    }
+    
+    //stop the skidsteer when at goal
+    bool stopped = false;
+    count = 1;
+    double velocity = 0.0;
+
+    while(!stopped){
+        command_ = {count, 0.0, 0.0};
+        
+        ROS_communication_->send(command_);
+        count++; 
+        readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+        // Calculate the vehicle's current velocity to determine if it has stopped.
+        double velocity = std::sqrt(std::pow(current_platform_odometry_.linear.x, 2) + std::pow(current_platform_odometry_.linear.y, 2));
+        if(velocity < 1e-1){
+            stopped = true; // Vehicle has stopped if velocity is below threshold.
+        }
+    }
+
+    // Final check after stopping to ensure the goal is still within tolerance.
+    readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+    double currentDistanceToGoal = std::sqrt(std::pow(target_goal_.x - current_platform_odometry_.position.x, 2) + std::pow(target_goal_.y - current_platform_odometry_.position.y, 2));
+    if(currentDistanceToGoal < tolerance_value_){
+
+        //track time taken to drive to the goal
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        double elapsed_time_seconds = elapsed.count();
+        time_in_motion_by_platform_ += elapsed_time_seconds; 
+        
+        return true; 
+    }
+    
+    else{
+        
+        return false;
+    }
+}
+
+// Calculate the distance to the goal based on current position.
+double SkidSteer::distanceToGoal() {
+
+    // Calculate the Euclidean distance between the current position and the goal.
+    bool readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+    double distance = std::sqrt(std::pow(current_platform_odometry_.position.x - target_goal_.x, 2) + std::pow(current_platform_odometry_.position.y - target_goal_.y, 2));
+    
+        return distance;
+
+}
+
+// using the atan fun. to guess the time tacken to get to the goals from current point
+double SkidSteer::timeToGoal(void) {
+
+    bool readOdometry = ROS_communication_->read(current_platform_odometry_, platform_type_);
+    
+    double rotatingAngleError;
+    
+    double angle = std::atan2(target_goal_.y - current_platform_odometry_.position.y, target_goal_.x - current_platform_odometry_.position.x);
+    
+    rotatingAngleError = current_platform_odometry_.yaw - angle;
+    
+    rotatingAngleError = abs(rotatingAngleError);
+    
+    double distanceToGoal = std::sqrt(std::pow(current_platform_odometry_.position.x - target_goal_.x, 2) + std::pow(current_platform_odometry_.position.y - target_goal_.y, 2));
+    
+    double timeToGoal = rotatingAngleError/rotate_left_ + distanceToGoal/move_foward_;
+    
+    return timeToGoal;
+
+}
+
+// Set the tolerance 
+bool SkidSteer::setTolerance(double tolerance) {
+
+    if (tolerance < 0) {
+        //negative tolrence are irlative
+        return false;
+    }
+    tolerance_value_ = tolerance; 
+    return true; 
+
+}
+
+// get the distance travelled by the skidsteer to the goal
+double SkidSteer::platformDistanceTravelled(void) {
+
+    return distance_travelled_by_platform_;
+
+}
+
+// get the time the skidsteer took to the get the goal.
+double SkidSteer::timeInMotion(void) {
+
+    return time_in_motion_by_platform_;
+
+}
+
+// get the current odometry of the skidsteer.
+pfms::nav_msgs::Odometry SkidSteer::getOdometry(void) {
+
+    ROS_communication_->read(current_platform_odometry_, platform_type_);
+    
+        return current_platform_odometry_;
+
 }
