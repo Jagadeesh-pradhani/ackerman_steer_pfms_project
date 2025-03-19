@@ -1,1 +1,0 @@
-/usr/lib/ccache/c++  -std=c++17 -rdynamic CMakeFiles/testAudi.dir/test_audi.o -o testAudi   -L/opt/ros/humble/lib  -Wl,-rpath,/opt/ros/humble/lib -lpfmshog -lexample -lpthread 
