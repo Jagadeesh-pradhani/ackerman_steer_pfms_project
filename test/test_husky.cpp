@@ -37,7 +37,7 @@ TEST_F(SkidSteerTest, Simple) {
 
     double dist = controllers.at(0)->distanceToGoal();
     double t = controllers.at(0)->timeToGoal();
-    cout << "SkidSteer: can reach goal " << dist << "[m] " << t << "[s]" << endl;
+    // cout << "SkidSteer: can reach goal " << dist << "[m] " << t << "[s]" << endl;
 
     std::cout << "SkidSteer: can reach goal " <<
                          dist << "[m] " << t << "[s]" << std::endl;
