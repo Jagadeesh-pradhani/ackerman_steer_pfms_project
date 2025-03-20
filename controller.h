@@ -9,7 +9,9 @@ class Controller: public ControllerInterface
 public:
   // Default constructor should set all attributes to a default value
   Controller();
-  ~Controller();
+  
+  // Virtual destructor to ensure proper cleanup in derived classes
+  virtual ~Controller();
 
   /**
   * Reach goal - execute control to reach goal, blocking call until goal reached or abandoned
@@ -28,7 +30,7 @@ public:
   * Getter for platform type
   * @return PlatformType
   */
-  pfms::PlatformType getPlatformType(void); // in controller
+  pfms::PlatformType getPlatformType(void) override; // in controller
 
   /**
   * Getter for distance to be travelled to reach goal, updates as the platform moves to current goal

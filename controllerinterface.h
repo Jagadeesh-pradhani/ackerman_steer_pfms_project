@@ -38,11 +38,11 @@ public:
   @param[in|out] estimatedGoalPose The estimated goal pose when reaching goal
   @return bool indicating the platform can reach the destination from origin supplied
   */
-  virtual bool checkOriginToDestination(pfms::nav_msgs::Odometry origin,
-                                        pfms::geometry_msgs::Point goal,
-                                        double& distance,
-                                        double& time,
-                                        pfms::nav_msgs::Odometry& estimatedGoalPose) = 0;
+  // virtual bool checkOriginToDestination(pfms::nav_msgs::Odometry origin,
+  //                                       pfms::geometry_msgs::Point goal,
+  //                                       double& distance,
+  //                                       double& time,
+  //                                       pfms::nav_msgs::Odometry& estimatedGoalPose) = 0;
 
   /**
   Getter for pltform type

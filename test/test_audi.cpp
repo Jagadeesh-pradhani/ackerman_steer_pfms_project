@@ -55,7 +55,7 @@ TEST_F(AckermanTest, Simple2) {
     pfms::geometry_msgs::Point pt{0,-6.5};
 
     bool reachable = controllers.at(0)->setGoal(pt);
-    cout << "Ackerman: can reach goal " << reachable << endl;
+    // cout << "Ackerman: can reach goal " << reachable << endl;
     ASSERT_TRUE(reachable);
 
     double dist = controllers.at(0)->distanceToGoal();
